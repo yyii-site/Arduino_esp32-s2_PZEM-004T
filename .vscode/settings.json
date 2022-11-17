@@ -1,0 +1,8 @@
+{
+    "commentTranslate.source": "Google",
+    "files.associations": {
+        "numeric": "cpp",
+        "new": "cpp"
+    },
+    "svg.preview.background": "white"
+}
