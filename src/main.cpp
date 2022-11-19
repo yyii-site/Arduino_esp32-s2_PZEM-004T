@@ -232,6 +232,7 @@ const char* CONFIG_FILE = "/ConfigMQTT.json";
 // Just dummy topics. To be updated later when got valid data from FS or Config Portal
 String MQTT_Pub_Topic   = "private/feeds/Temperature";
 String MQTT_Pub_Topic_Power   = "stat/esp32s2/PowerMeter";
+String MQTT_Sub_Topic_Power   = "cmnd/esp32s2/PowerMeter";
 
 // Variables to save custom parameters to...
 // I would like to use these instead of #defines
@@ -460,6 +461,9 @@ WiFiClient *client                    = NULL;
 Adafruit_MQTT_Client    *mqtt         = NULL;
 Adafruit_MQTT_Publish   *Temperature  = NULL;
 Adafruit_MQTT_Publish   *Pub_PowerMeter = NULL;
+
+// Setup a feed called 'time' for subscribing to current time
+Adafruit_MQTT_Subscribe *Sub_PowerMeter = NULL;
 
 // Forward Declaration
 
@@ -721,10 +725,21 @@ void PZEMtoMQTT()
   }
 }
 
+void powerMeterCallback(uint32_t buff)
+{
+  Serial.print(F("MQTT Sub Number:"));
+  Serial.println(buff);
+  if(buff == 123)
+  {
+    pzem.resetEnergy();
+    Serial.print(F("PZEM Reset Energy!"));
+  }
+}
+
 void publishMQTT()
 {
   MQTT_connect();
-  TEMPERtoMQTT();
+  //TEMPERtoMQTT();
   PZEMtoMQTT();
 }
 
@@ -747,8 +762,8 @@ void check_status()
   
   ulong current_millis = millis();
 
-#define LED_INTERVAL          5000L
-#define PUBLISH_INTERVAL      30000L
+#define LED_INTERVAL          10000L
+#define PUBLISH_INTERVAL      20000L
 
 #define WIFICHECK_INTERVAL    1000L
 
@@ -917,6 +932,14 @@ void deleteOldInstances()
 
     Serial.println(F("Deleting old PowerMeter object"));
   }
+
+  if (Sub_PowerMeter)
+  {
+    delete Sub_PowerMeter;
+    Sub_PowerMeter = NULL;
+
+    Serial.println(F("Deleting old PowerMeter Sub object"));
+  }
 }
 
 void createNewInstances()
@@ -978,6 +1001,28 @@ void createNewInstances()
     {
       Serial.println(F("OK"));
       Serial.println(String("Pub_PowerMeter MQTT_Pub_Topic = ")  + MQTT_Pub_Topic_Power);
+    }
+    else
+      Serial.println(F("Failed"));
+  }
+
+  if(!Sub_PowerMeter)
+  {
+    Serial.println(F("Creating new MQTT_Sub_Topic,  Sub_PowerMeter"));
+    Sub_PowerMeter = new Adafruit_MQTT_Subscribe(mqtt, MQTT_Sub_Topic_Power.c_str());
+
+    Serial.print(F("Creating new Sub_PowerMeter object : "));
+    
+    if (Sub_PowerMeter)
+    {
+      Sub_PowerMeter->setCallback(powerMeterCallback);
+      if(mqtt->subscribe(Sub_PowerMeter))
+      {
+        Serial.println(F("OK"));
+        Serial.println(String("Sub_PowerMeter MQTT_Sub_Topic = ")  + MQTT_Sub_Topic_Power);
+      } else {
+        Serial.println(F("MQTT Sub failed"));
+      }
     }
     else
       Serial.println(F("Failed"));
@@ -1628,4 +1673,5 @@ void loop()
 
   // this is just for checking if we are connected to WiFi
   check_status();
+  mqtt->processPackets(100);
 }
